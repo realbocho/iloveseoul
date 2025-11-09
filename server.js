@@ -197,32 +197,34 @@ app.post('/api/recommendations/delete', async (req, res) => {
             return res.status(400).json({ error: '필수 필드가 누락되었습니다.' });
         }
 
-        const tolerance = 0.0001;
+        const tolerance = 0.0005; // 좌표 매칭 범위를 넓힘 (약 50m)
         const parsedX = parseFloat(x);
         const parsedY = parseFloat(y);
-        const roundedX = Math.round(parsedX / tolerance) * tolerance;
-        const roundedY = Math.round(parsedY / tolerance) * tolerance;
+        
+        if (isNaN(parsedX) || isNaN(parsedY)) {
+            console.error('❌ 좌표 파싱 실패:', { x, y, parsedX, parsedY });
+            return res.status(400).json({ error: '유효하지 않은 좌표입니다.' });
+        }
 
         console.log('📍 좌표 범위:', {
             x: parsedX,
             y: parsedY,
-            roundedX,
-            roundedY,
-            xMin: roundedX - tolerance,
-            xMax: roundedX + tolerance,
-            yMin: roundedY - tolerance,
-            yMax: roundedY + tolerance
+            xMin: parsedX - tolerance,
+            xMax: parsedX + tolerance,
+            yMin: parsedY - tolerance,
+            yMax: parsedY + tolerance
         });
 
         // 먼저 해당 조건에 맞는 데이터 조회
+        // placeName으로 먼저 필터링하고, 좌표 범위로 추가 필터링
         const { data: targetData, error: selectError } = await supabase
             .from('recommendations')
             .select('id, place_name, x, y')
             .eq('place_name', placeName)
-            .gte('x', roundedX - tolerance)
-            .lte('x', roundedX + tolerance)
-            .gte('y', roundedY - tolerance)
-            .lte('y', roundedY + tolerance);
+            .gte('x', parsedX - tolerance)
+            .lte('x', parsedX + tolerance)
+            .gte('y', parsedY - tolerance)
+            .lte('y', parsedY + tolerance);
 
         if (selectError) {
             console.error('❌ 데이터 조회 오류:', selectError);
