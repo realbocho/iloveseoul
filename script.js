@@ -201,14 +201,37 @@ async function handleRecommendSubmit(e) {
 
                     if (!response.ok) {
                         // 서버가 보낸 자세한 오류 메시지를 로그에 출력
-                        let bodyText = '';
+                        let errorData = {};
                         try {
-                            bodyText = await response.text();
+                            const text = await response.text();
+                            if (text) {
+                                errorData = JSON.parse(text);
+                            }
                         } catch (e) {
-                            bodyText = '<응답 본문을 읽는 중 오류 발생>';
+                            console.error('응답 파싱 오류:', e);
+                            errorData = { error: '서버 응답을 파싱할 수 없습니다.' };
                         }
-                        console.error('추천 저장 실패. 상태:', response.status, '응답:', bodyText);
-                        alert('⚠️ 추천 저장 중 서버 오류가 발생했습니다.\n개발자 콘솔을 확인하세요.');
+                        
+                        console.error('❌ 추천 저장 실패:', {
+                            status: response.status,
+                            statusText: response.statusText,
+                            error: errorData.error,
+                            details: errorData.details,
+                            hint: errorData.hint,
+                            code: errorData.code
+                        });
+                        
+                        let errorMessage = '⚠️ 추천 저장 중 서버 오류가 발생했습니다.\n\n';
+                        errorMessage += `오류: ${errorData.error || '알 수 없는 오류'}\n`;
+                        if (errorData.details) {
+                            errorMessage += `상세: ${errorData.details}\n`;
+                        }
+                        if (errorData.hint) {
+                            errorMessage += `힌트: ${errorData.hint}\n`;
+                        }
+                        errorMessage += '\n개발자 콘솔을 확인하세요.';
+                        
+                        alert(errorMessage);
                         restoreButton();
                         return;
                     }
