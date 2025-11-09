@@ -497,15 +497,34 @@ async function deleteRecommendation(placeName, x, y) {
             })
         });
         
-        const responseData = await response.json().catch(() => ({}));
+        let responseData = {};
+        try {
+            const text = await response.text();
+            if (text) {
+                responseData = JSON.parse(text);
+            }
+        } catch (e) {
+            console.error('응답 파싱 오류:', e);
+            responseData = { error: '서버 응답을 파싱할 수 없습니다.' };
+        }
         
         if (!response.ok) {
             console.error('❌ 삭제 실패:', {
                 status: response.status,
+                statusText: response.statusText,
                 error: responseData.error,
-                details: responseData.details
+                details: responseData.details,
+                fullResponse: responseData
             });
-            throw new Error(responseData.error || '삭제 실패');
+            
+            let errorMessage = responseData.error || '삭제 실패';
+            if (response.status === 404) {
+                errorMessage = '삭제할 추천을 찾을 수 없습니다.\n\n장소명과 좌표를 확인해주세요.';
+            } else if (responseData.details) {
+                errorMessage += '\n상세: ' + responseData.details;
+            }
+            
+            throw new Error(errorMessage);
         }
         
         console.log('✅ 삭제 성공:', responseData);
