@@ -166,8 +166,17 @@ async function handleRecommendSubmit(e) {
         // 장소 검색
         const ps = new kakao.maps.services.Places();
         ps.keywordSearch(placeName, async (data, status) => {
+            // 버튼 상태 복원을 위한 함수
+            const restoreButton = () => {
+                if (submitButton) {
+                    submitButton.textContent = originalText;
+                    submitButton.disabled = false;
+                }
+            };
+
             try {
-                if (status === kakao.maps.services.Status.OK && data.length > 0) {
+                // 검색 성공 및 결과가 있는 경우
+                if (status === kakao.maps.services.Status.OK && data && data.length > 0) {
                     const place = data[0];
 
                     // 서버에 추천 저장
@@ -194,7 +203,8 @@ async function handleRecommendSubmit(e) {
                             bodyText = '<응답 본문을 읽는 중 오류 발생>';
                         }
                         console.error('추천 저장 실패. 상태:', response.status, '응답:', bodyText);
-                        alert('추천 저장 중 서버 오류가 발생했습니다. 개발자 콘솔을 확인하세요.');
+                        alert('⚠️ 추천 저장 중 서버 오류가 발생했습니다.\n개발자 콘솔을 확인하세요.');
+                        restoreButton();
                         return;
                     }
 
@@ -203,24 +213,34 @@ async function handleRecommendSubmit(e) {
 
                     // 폼 초기화
                     document.getElementById('recommendForm').reset();
-                    alert('추천이 등록되었습니다!');
-                } else {
-                    alert('장소를 찾을 수 없습니다. 다른 이름으로 검색해보세요.');
+                    alert('✅ 추천이 등록되었습니다!');
+                    restoreButton();
+                } 
+                // 검색 결과가 없는 경우
+                else if (status === kakao.maps.services.Status.ZERO_RESULT) {
+                    alert('⚠️ 검색 결과가 없습니다.\n\n입력하신 장소명을 다시 확인해주세요.\n다른 이름으로 검색해보시거나 정확한 주소를 입력해주세요.');
+                    restoreButton();
+                }
+                // 검색 오류가 발생한 경우
+                else if (status === kakao.maps.services.Status.ERROR) {
+                    alert('⚠️ 장소 검색 중 오류가 발생했습니다.\n\n잠시 후 다시 시도해주세요.');
+                    restoreButton();
+                }
+                // 기타 오류
+                else {
+                    console.error('장소 검색 실패:', { status, data });
+                    alert('⚠️ 장소를 찾을 수 없습니다.\n\n입력하신 장소명을 다시 확인해주세요.\n다른 이름으로 검색해보시거나 정확한 주소를 입력해주세요.');
+                    restoreButton();
                 }
             } catch (error) {
                 console.error('추천 저장 처리 중 오류:', error);
-                alert('추천 저장 중 오류가 발생했습니다. 개발자 콘솔을 확인하세요.');
-            } finally {
-                // 버튼 원래대로 복원 (모든 경로에서)
-                if (submitButton) {
-                    submitButton.textContent = originalText;
-                    submitButton.disabled = false;
-                }
+                alert('⚠️ 추천 저장 중 오류가 발생했습니다.\n\n개발자 콘솔을 확인하세요.');
+                restoreButton();
             }
         });
     } catch (error) {
         console.error('장소 검색 오류:', error);
-        alert('장소 검색 중 오류가 발생했습니다.');
+        alert('⚠️ 장소 검색 중 오류가 발생했습니다.\n\n잠시 후 다시 시도해주세요.');
         if (submitButton) {
             submitButton.textContent = originalText;
             submitButton.disabled = false;
