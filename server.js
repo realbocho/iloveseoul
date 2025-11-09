@@ -185,7 +185,8 @@ app.post('/api/recommendations', async (req, res) => {
 });
 
 // 추천 장소 삭제 (관리자)
-app.delete('/api/recommendations', async (req, res) => {
+// Vercel에서 DELETE 메서드가 제대로 작동하지 않을 수 있어 POST로 변경
+app.post('/api/recommendations/delete', async (req, res) => {
     try {
         const { placeName, x, y } = req.body;
 
