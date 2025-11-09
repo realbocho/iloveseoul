@@ -477,6 +477,8 @@ async function deleteRecommendation(placeName, x, y) {
     }
     
     try {
+        console.log('🗑️ 삭제 요청:', { placeName, x, y });
+        
         const response = await fetch(`${API_BASE_URL}/recommendations`, {
             method: 'DELETE',
             headers: {
@@ -484,22 +486,30 @@ async function deleteRecommendation(placeName, x, y) {
             },
             body: JSON.stringify({
                 placeName: placeName,
-                x: x,
-                y: y
+                x: parseFloat(x),
+                y: parseFloat(y)
             })
         });
         
+        const responseData = await response.json().catch(() => ({}));
+        
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: '삭제 실패' }));
-            throw new Error(errorData.error || '삭제 실패');
+            console.error('❌ 삭제 실패:', {
+                status: response.status,
+                error: responseData.error,
+                details: responseData.details
+            });
+            throw new Error(responseData.error || '삭제 실패');
         }
+        
+        console.log('✅ 삭제 성공:', responseData);
         
         // 성공 시 데이터 다시 로드
         await loadRecommendations();
-        alert('✅ 추천이 삭제되었습니다.');
+        alert(`✅ 추천이 삭제되었습니다.\n삭제된 개수: ${responseData.deletedCount || 0}개`);
     } catch (error) {
-        console.error('삭제 오류:', error);
-        alert('⚠️ 삭제 중 오류가 발생했습니다: ' + error.message);
+        console.error('❌ 삭제 오류:', error);
+        alert('⚠️ 삭제 중 오류가 발생했습니다:\n' + error.message + '\n\n개발자 콘솔을 확인하세요.');
     }
 }
 
