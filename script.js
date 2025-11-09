@@ -562,11 +562,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 sidebar.classList.add('collapsed');
                 toggleButton.textContent = '⮞ 펼치기';
             }
-            // 지도 크기 재조정
+            // 지도 크기 재조정 및 마커 재표시
             if (map) {
+                // CSS transition이 완료될 때까지 대기 후 지도 크기 재조정
                 setTimeout(() => {
                     kakao.maps.event.trigger(map, 'resize');
-                }, 100);
+                    // 마커가 제대로 표시되도록 약간의 지연 후 다시 업데이트
+                    setTimeout(() => {
+                        updateMarkers();
+                    }, 50);
+                }, 350); // CSS transition 시간(0.3s)보다 약간 길게
             }
         };
     }
