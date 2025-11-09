@@ -319,16 +319,22 @@ function updateMarkers() {
             const position = new kakao.maps.LatLng(parseFloat(place.y), parseFloat(place.x));
             const recommendationCount = place.reasons ? place.reasons.length : 0;
             
+            // 5개 이상 추천받으면 빨간색 마커, 그 외는 기본 마커
+            let markerImage = null;
+            if (recommendationCount >= 5) {
+                // 빨간색 마커 이미지 생성
+                const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
+                const imageSize = new kakao.maps.Size(24, 35);
+                const imageOption = { offset: new kakao.maps.Point(12, 35) };
+                markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
+            }
+            
             // 마커 생성
             const marker = new kakao.maps.Marker({
                 position: position,
-                map: map
+                map: map,
+                image: markerImage // 5개 이상이면 빨간색, 아니면 기본 마커
             });
-            
-            // 5개 미만 추천은 투명하게
-            if (recommendationCount < 5) {
-                marker.setOpacity(0.3);
-            }
             
             // 마커 클릭 이벤트
             const overlay = createCustomOverlay(place);
