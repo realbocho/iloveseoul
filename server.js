@@ -192,58 +192,70 @@ app.post('/api/recommendations/delete', async (req, res) => {
 
         console.log('🗑️ 추천 삭제 요청:', { placeName, x, y });
 
-        if (!placeName || x === undefined || y === undefined) {
-            console.error('❌ 필수 필드 누락:', { placeName: !!placeName, x, y });
-            return res.status(400).json({ error: '필수 필드가 누락되었습니다.' });
+        if (!placeName) {
+            console.error('❌ 필수 필드 누락: placeName');
+            return res.status(400).json({ error: '장소명이 필요합니다.' });
         }
 
-        const tolerance = 0.0005; // 좌표 매칭 범위를 넓힘 (약 50m)
-        const parsedX = parseFloat(x);
-        const parsedY = parseFloat(y);
-        
-        if (isNaN(parsedX) || isNaN(parsedY)) {
-            console.error('❌ 좌표 파싱 실패:', { x, y, parsedX, parsedY });
-            return res.status(400).json({ error: '유효하지 않은 좌표입니다.' });
-        }
-
-        console.log('📍 좌표 범위:', {
-            x: parsedX,
-            y: parsedY,
-            xMin: parsedX - tolerance,
-            xMax: parsedX + tolerance,
-            yMin: parsedY - tolerance,
-            yMax: parsedY + tolerance
-        });
-
-        // 먼저 해당 조건에 맞는 데이터 조회
-        // placeName으로 먼저 필터링하고, 좌표 범위로 추가 필터링
-        const { data: targetData, error: selectError } = await supabase
+        // 먼저 해당 장소명의 모든 데이터 조회 (디버깅용)
+        const { data: allData, error: allError } = await supabase
             .from('recommendations')
             .select('id, place_name, x, y')
-            .eq('place_name', placeName)
-            .gte('x', parsedX - tolerance)
-            .lte('x', parsedX + tolerance)
-            .gte('y', parsedY - tolerance)
-            .lte('y', parsedY + tolerance);
+            .eq('place_name', placeName);
 
-        if (selectError) {
-            console.error('❌ 데이터 조회 오류:', selectError);
+        if (allError) {
+            console.error('❌ 데이터 조회 오류:', allError);
             return res.status(500).json({ 
-                error: '데이터 조회 실패: ' + selectError.message
+                error: '데이터 조회 실패: ' + allError.message
             });
         }
 
-        console.log('📊 조회된 데이터:', targetData?.length || 0, '개');
+        console.log('📊 장소명으로 조회된 모든 데이터:', allData?.length || 0, '개');
+        if (allData && allData.length > 0) {
+            console.log('📍 조회된 데이터 샘플:', allData.slice(0, 3));
+        }
+
+        // 좌표가 제공된 경우 좌표 범위로 필터링, 없으면 장소명만으로 삭제
+        let targetData = allData;
+        
+        if (x !== undefined && y !== undefined) {
+            const tolerance = 0.001; // 좌표 매칭 범위를 더 넓힘 (약 100m)
+            const parsedX = parseFloat(x);
+            const parsedY = parseFloat(y);
+            
+            if (!isNaN(parsedX) && !isNaN(parsedY)) {
+                console.log('📍 좌표 필터링:', {
+                    x: parsedX,
+                    y: parsedY,
+                    tolerance: tolerance
+                });
+                
+                // 좌표 범위로 필터링
+                targetData = allData.filter(row => {
+                    const rowX = parseFloat(row.x);
+                    const rowY = parseFloat(row.y);
+                    return Math.abs(rowX - parsedX) <= tolerance && 
+                           Math.abs(rowY - parsedY) <= tolerance;
+                });
+                
+                console.log('📍 좌표 필터링 후:', targetData?.length || 0, '개');
+            } else {
+                console.warn('⚠️ 좌표가 유효하지 않아 장소명만으로 삭제합니다.');
+            }
+        }
 
         if (!targetData || targetData.length === 0) {
+            console.warn('⚠️ 삭제할 데이터가 없습니다.');
             return res.status(404).json({ 
                 error: '삭제할 추천을 찾을 수 없습니다.',
-                deletedCount: 0
+                deletedCount: 0,
+                searchedCount: allData?.length || 0
             });
         }
 
         // ID 목록으로 삭제
         const idsToDelete = targetData.map(row => row.id);
+        console.log('🗑️ 삭제할 ID 목록:', idsToDelete.length, '개');
         
         const { data: deletedData, error: deleteError } = await supabase
             .from('recommendations')
