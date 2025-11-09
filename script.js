@@ -136,7 +136,10 @@ async function loadRecommendations() {
         const data = await response.json();
         recommendations = data;
         updateRecommendationsDisplay();
-        updateMarkers();
+        // 마커 업데이트를 즉시 실행 (지연 없이)
+        if (map) {
+            updateMarkers();
+        }
         console.log('추천 데이터를 불러왔습니다:', Object.keys(recommendations).length + '개 장소');
     } catch (error) {
         console.error('추천 데이터 로드 오류:', error);
@@ -564,14 +567,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             // 지도 크기 재조정 및 마커 재표시
             if (map) {
-                // CSS transition이 완료될 때까지 대기 후 지도 크기 재조정
+                // 지도 크기 재조정을 즉시 실행하고, transition 완료 후 마커 업데이트
+                kakao.maps.event.trigger(map, 'resize');
+                // CSS transition이 완료된 후 마커 재표시
                 setTimeout(() => {
-                    kakao.maps.event.trigger(map, 'resize');
-                    // 마커가 제대로 표시되도록 약간의 지연 후 다시 업데이트
-                    setTimeout(() => {
-                        updateMarkers();
-                    }, 50);
-                }, 350); // CSS transition 시간(0.3s)보다 약간 길게
+                    updateMarkers();
+                }, 320); // CSS transition 시간(0.3s)보다 약간 길게
             }
         };
     }
