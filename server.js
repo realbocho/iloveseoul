@@ -184,6 +184,52 @@ app.post('/api/recommendations', async (req, res) => {
     }
 });
 
+// 추천 장소 삭제 (관리자)
+app.delete('/api/recommendations', async (req, res) => {
+    try {
+        const { placeName, x, y } = req.body;
+
+        if (!placeName || !x || !y) {
+            return res.status(400).json({ error: '필수 필드가 누락되었습니다.' });
+        }
+
+        // 좌표를 기준으로 해당 장소의 모든 추천 삭제
+        const tolerance = 0.0001;
+        const roundedX = Math.round(parseFloat(x) / tolerance) * tolerance;
+        const roundedY = Math.round(parseFloat(y) / tolerance) * tolerance;
+
+        // 좌표 범위로 삭제 (약 10m 이내의 모든 추천)
+        const { data, error } = await supabase
+            .from('recommendations')
+            .delete()
+            .eq('place_name', placeName)
+            .gte('x', roundedX - tolerance)
+            .lte('x', roundedX + tolerance)
+            .gte('y', roundedY - tolerance)
+            .lte('y', roundedY + tolerance)
+            .select();
+
+        if (error) {
+            console.error('추천 삭제 오류:', error.message);
+            return res.status(500).json({ 
+                error: '삭제 실패: ' + error.message
+            });
+        }
+
+        res.json({ 
+            success: true, 
+            message: '추천이 삭제되었습니다.',
+            deletedCount: data?.length || 0
+        });
+    } catch (error) {
+        console.error('추천 삭제 중 오류:', error);
+        res.status(500).json({ 
+            error: '서버 오류가 발생했습니다.',
+            message: error.message 
+        });
+    }
+});
+
 // Vercel 서버리스 함수로 export
 module.exports = app;
 
