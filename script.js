@@ -3,6 +3,8 @@
 let map;
 let markers = [];
 let recommendations = {}; // 장소별 추천 데이터 저장
+let isAdminLoggedIn = false; // 관리자 로그인 상태
+const ADMIN_PASSWORD = 'nohuichan3955!'; // 관리자 비밀번호
 
 // API 베이스 URL 설정
 // 우선순위: window.API_BASE_URL (index.html에서 설정 가능한 값) -> 자동 감지된 값 -> 로컬 기본
@@ -271,9 +273,17 @@ function updateRecommendationsDisplay() {
             item.style.borderLeftColor = '#27ae60';
         }
         
+        let deleteBtnHtml = '';
+        if (isAdminLoggedIn) {
+            // 특수문자 이스케이프 처리
+            const escapedPlaceName = place.placeName.replace(/'/g, "\\'");
+            deleteBtnHtml = `<button class="delete-btn" onclick="deleteRecommendation('${escapedPlaceName}', ${place.x}, ${place.y})" title="삭제">×</button>`;
+        }
+        
         item.innerHTML = `
             <strong>${place.placeName}</strong>
             <div class="count">추천 ${place.reasons.length}개</div>
+            ${deleteBtnHtml}
         `;
         
         listContainer.appendChild(item);
@@ -372,7 +382,15 @@ function createCustomOverlay(place) {
         });
     }
     
+    let deleteBtnHtml = '';
+    if (isAdminLoggedIn) {
+        // 특수문자 이스케이프 처리
+        const escapedPlaceName = place.placeName.replace(/'/g, "\\'");
+        deleteBtnHtml = `<button class="delete-btn" onclick="deleteRecommendation('${escapedPlaceName}', ${place.x}, ${place.y})" title="삭제">×</button>`;
+    }
+    
     div.innerHTML = `
+        ${deleteBtnHtml}
         <h3>${place.placeName}</h3>
         <div style="font-size: 12px; color: #999; margin-bottom: 10px;">
             ${place.address || '주소 없음'}
@@ -387,6 +405,102 @@ function createCustomOverlay(place) {
     `;
     
     return div;
+}
+
+// 관리자 로그인 모달 열기
+function openAdminModal() {
+    const modal = document.getElementById('adminModal');
+    if (modal) {
+        modal.style.display = 'block';
+        document.getElementById('adminPassword').focus();
+    }
+}
+
+// 관리자 로그인 모달 닫기
+function closeAdminModal() {
+    const modal = document.getElementById('adminModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.getElementById('adminPassword').value = '';
+        document.getElementById('adminError').style.display = 'none';
+    }
+}
+
+// 관리자 로그인 처리
+function handleAdminLogin(e) {
+    e.preventDefault();
+    const password = document.getElementById('adminPassword').value;
+    const errorDiv = document.getElementById('adminError');
+    
+    if (password === ADMIN_PASSWORD) {
+        isAdminLoggedIn = true;
+        const adminBtn = document.getElementById('adminLoginBtn');
+        if (adminBtn) {
+            adminBtn.textContent = '로그아웃';
+            adminBtn.classList.add('logged-in');
+        }
+        closeAdminModal();
+        // 삭제 버튼 표시를 위해 화면 업데이트
+        updateRecommendationsDisplay();
+        updateMarkers();
+        alert('✅ 관리자로 로그인되었습니다.');
+    } else {
+        errorDiv.textContent = '비밀번호가 올바르지 않습니다.';
+        errorDiv.style.display = 'block';
+        document.getElementById('adminPassword').value = '';
+    }
+}
+
+// 관리자 로그아웃
+function handleAdminLogout() {
+    isAdminLoggedIn = false;
+    const adminBtn = document.getElementById('adminLoginBtn');
+    if (adminBtn) {
+        adminBtn.textContent = '관리자';
+        adminBtn.classList.remove('logged-in');
+    }
+    // 삭제 버튼 숨기기를 위해 화면 업데이트
+    updateRecommendationsDisplay();
+    updateMarkers();
+    alert('로그아웃되었습니다.');
+}
+
+// 추천 장소 삭제
+async function deleteRecommendation(placeName, x, y) {
+    if (!isAdminLoggedIn) {
+        alert('관리자 권한이 필요합니다.');
+        return;
+    }
+    
+    if (!confirm(`"${placeName}" 장소의 모든 추천을 삭제하시겠습니까?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/recommendations`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                placeName: placeName,
+                x: x,
+                y: y
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: '삭제 실패' }));
+            throw new Error(errorData.error || '삭제 실패');
+        }
+        
+        // 성공 시 데이터 다시 로드
+        await loadRecommendations();
+        alert('✅ 추천이 삭제되었습니다.');
+    } catch (error) {
+        console.error('삭제 오류:', error);
+        alert('⚠️ 삭제 중 오류가 발생했습니다: ' + error.message);
+    }
 }
 
 // 페이지 로드 시 초기화
@@ -420,6 +534,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 100);
             }
         };
+    }
+    
+    // 관리자 로그인 버튼 이벤트
+    const adminLoginBtn = document.getElementById('adminLoginBtn');
+    if (adminLoginBtn) {
+        adminLoginBtn.onclick = function() {
+            if (isAdminLoggedIn) {
+                handleAdminLogout();
+            } else {
+                openAdminModal();
+            }
+        };
+    }
+    
+    // 관리자 로그인 모달 닫기
+    const adminModal = document.getElementById('adminModal');
+    const adminModalClose = document.querySelector('.admin-modal-close');
+    if (adminModalClose) {
+        adminModalClose.onclick = closeAdminModal;
+    }
+    if (adminModal) {
+        adminModal.onclick = function(e) {
+            if (e.target === adminModal) {
+                closeAdminModal();
+            }
+        };
+    }
+    
+    // 관리자 로그인 폼 제출
+    const adminLoginForm = document.getElementById('adminLoginForm');
+    if (adminLoginForm) {
+        adminLoginForm.addEventListener('submit', handleAdminLogin);
     }
 });
 
