@@ -189,40 +189,82 @@ app.delete('/api/recommendations', async (req, res) => {
     try {
         const { placeName, x, y } = req.body;
 
-        if (!placeName || !x || !y) {
+        console.log('🗑️ 추천 삭제 요청:', { placeName, x, y });
+
+        if (!placeName || x === undefined || y === undefined) {
+            console.error('❌ 필수 필드 누락:', { placeName: !!placeName, x, y });
             return res.status(400).json({ error: '필수 필드가 누락되었습니다.' });
         }
 
-        // 좌표를 기준으로 해당 장소의 모든 추천 삭제
         const tolerance = 0.0001;
-        const roundedX = Math.round(parseFloat(x) / tolerance) * tolerance;
-        const roundedY = Math.round(parseFloat(y) / tolerance) * tolerance;
+        const parsedX = parseFloat(x);
+        const parsedY = parseFloat(y);
+        const roundedX = Math.round(parsedX / tolerance) * tolerance;
+        const roundedY = Math.round(parsedY / tolerance) * tolerance;
 
-        // 좌표 범위로 삭제 (약 10m 이내의 모든 추천)
-        const { data, error } = await supabase
+        console.log('📍 좌표 범위:', {
+            x: parsedX,
+            y: parsedY,
+            roundedX,
+            roundedY,
+            xMin: roundedX - tolerance,
+            xMax: roundedX + tolerance,
+            yMin: roundedY - tolerance,
+            yMax: roundedY + tolerance
+        });
+
+        // 먼저 해당 조건에 맞는 데이터 조회
+        const { data: targetData, error: selectError } = await supabase
             .from('recommendations')
-            .delete()
+            .select('id, place_name, x, y')
             .eq('place_name', placeName)
             .gte('x', roundedX - tolerance)
             .lte('x', roundedX + tolerance)
             .gte('y', roundedY - tolerance)
-            .lte('y', roundedY + tolerance)
-            .select();
+            .lte('y', roundedY + tolerance);
 
-        if (error) {
-            console.error('추천 삭제 오류:', error.message);
+        if (selectError) {
+            console.error('❌ 데이터 조회 오류:', selectError);
             return res.status(500).json({ 
-                error: '삭제 실패: ' + error.message
+                error: '데이터 조회 실패: ' + selectError.message
             });
         }
+
+        console.log('📊 조회된 데이터:', targetData?.length || 0, '개');
+
+        if (!targetData || targetData.length === 0) {
+            return res.status(404).json({ 
+                error: '삭제할 추천을 찾을 수 없습니다.',
+                deletedCount: 0
+            });
+        }
+
+        // ID 목록으로 삭제
+        const idsToDelete = targetData.map(row => row.id);
+        
+        const { data: deletedData, error: deleteError } = await supabase
+            .from('recommendations')
+            .delete()
+            .in('id', idsToDelete)
+            .select();
+
+        if (deleteError) {
+            console.error('❌ 삭제 오류:', deleteError);
+            return res.status(500).json({ 
+                error: '삭제 실패: ' + deleteError.message,
+                details: deleteError.details || null
+            });
+        }
+
+        console.log('✅ 삭제 성공:', deletedData?.length || 0, '개');
 
         res.json({ 
             success: true, 
             message: '추천이 삭제되었습니다.',
-            deletedCount: data?.length || 0
+            deletedCount: deletedData?.length || 0
         });
     } catch (error) {
-        console.error('추천 삭제 중 오류:', error);
+        console.error('❌ 추천 삭제 중 예외 발생:', error);
         res.status(500).json({ 
             error: '서버 오류가 발생했습니다.',
             message: error.message 
