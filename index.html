@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>서울 추천 장소 지도</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>서울 추천 장소 지도</h1>
+        </header>
+        
+        <div class="main-content">
+            <div id="sidebar" class="sidebar">
+                <button id="toggleSidebar">⮜ 접기</button>
+                <div class="sidebar-content">
+                    <div class="input-section">
+                        <h2>장소 추천하기</h2>
+                        <form id="recommendForm">
+                            <div class="form-group">
+                                <label for="placeName">장소명</label>
+                                <input type="text" id="placeName" placeholder="예: 강남역 스타벅스" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="reason">추천 사유</label>
+                                <textarea id="reason" placeholder="이 장소를 추천하는 이유를 입력하세요" required></textarea>
+                            </div>
+                            <button type="submit">추천하기</button>
+                        </form>
+                    </div>
+                    
+                    <div class="recommendations-section">
+                        <h2>추천 현황</h2>
+                        <div id="recommendationsList"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="map-container">
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 카카오맵 API -->
+    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=cbbb536047b180ef5a78cc84146a49f5&libraries=services" 
+            onerror="console.error('카카오맵 스크립트 로드 실패'); window.kakaoMapError = true;"></script>
+    
+    <!-- API URL 설정 -->
+    <script>
+        window.API_BASE_URL = 'https://seoul2.vercel.app/api';  // Vercel 배포 URL
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>
+

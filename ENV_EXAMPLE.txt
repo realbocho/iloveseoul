@@ -1,0 +1,16 @@
+# Supabase 설정
+# 이 파일을 .env로 복사하고 실제 값으로 변경하세요
+# 
+# Supabase 프로젝트 대시보드에서 다음 값들을 가져와서 설정하세요:
+# 1. https://app.supabase.com 접속
+# 2. 프로젝트 선택
+# 3. Settings > API 메뉴에서 다음 정보 확인:
+#    - Project URL -> SUPABASE_URL
+#    - service_role key (secret) -> SUPABASE_SERVICE_ROLE_KEY
+
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# 서버 포트 (선택사항)
+PORT=3000
+
