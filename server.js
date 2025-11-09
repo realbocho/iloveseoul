@@ -31,6 +31,16 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 console.log('✅ Supabase 클라이언트가 초기화되었습니다.');
 
+// 좌표를 기준으로 장소를 그룹화하는 함수
+// 같은 좌표(또는 매우 가까운 좌표)에 있는 장소들을 같은 장소로 취급
+function getLocationKey(x, y, tolerance = 0.0001) {
+    // 좌표를 tolerance 단위로 반올림하여 그룹화
+    // tolerance = 0.0001도는 약 10미터 거리
+    const roundedX = Math.round(x / tolerance) * tolerance;
+    const roundedY = Math.round(y / tolerance) * tolerance;
+    return `${roundedX.toFixed(6)},${roundedY.toFixed(6)}`;
+}
+
 // 모든 추천 장소 가져오기
 app.get('/api/recommendations', async (req, res) => {
     try {
@@ -45,22 +55,86 @@ app.get('/api/recommendations', async (req, res) => {
             return res.status(500).json({ error: '데이터 조회 실패' });
         }
 
-        // 장소별로 그룹화하여 reasons 배열 생성
+        // 좌표를 기준으로 장소별로 그룹화하여 reasons 배열 생성
         const recommendations = {};
+        const locationGroups = {}; // 좌표별로 그룹화된 데이터
+        
         if (data) {
             data.forEach(row => {
-                const key = row.place_name;
-                if (!recommendations[key]) {
-                    recommendations[key] = {
-                        placeName: row.place_name,
-                        address: row.address || '',
+                const locationKey = getLocationKey(row.x, row.y);
+                
+                // 좌표별 그룹에 데이터 추가
+                if (!locationGroups[locationKey]) {
+                    locationGroups[locationKey] = {
+                        placeNames: {}, // 장소명별 카운트
+                        addresses: {}, // 주소별 카운트
                         x: row.x,
                         y: row.y,
                         reasons: []
                     };
                 }
+                
+                // 가장 많이 사용된 장소명과 주소를 추적
+                if (row.place_name) {
+                    locationGroups[locationKey].placeNames[row.place_name] = 
+                        (locationGroups[locationKey].placeNames[row.place_name] || 0) + 1;
+                }
+                if (row.address) {
+                    locationGroups[locationKey].addresses[row.address] = 
+                        (locationGroups[locationKey].addresses[row.address] || 0) + 1;
+                }
+                
                 if (row.reason) {
-                    recommendations[key].reasons.push(row.reason);
+                    locationGroups[locationKey].reasons.push(row.reason);
+                }
+            });
+            
+            // 각 좌표 그룹을 recommendations 객체로 변환
+            Object.keys(locationGroups).forEach(locationKey => {
+                const group = locationGroups[locationKey];
+                
+                // 가장 많이 사용된 장소명 선택
+                const mostUsedPlaceName = Object.keys(group.placeNames).length > 0
+                    ? Object.keys(group.placeNames).reduce((a, b) => 
+                        group.placeNames[a] > group.placeNames[b] ? a : b)
+                    : '알 수 없는 장소';
+                
+                // 가장 많이 사용된 주소 선택
+                const mostUsedAddress = Object.keys(group.addresses).length > 0
+                    ? Object.keys(group.addresses).reduce((a, b) => 
+                        group.addresses[a] > group.addresses[b] ? a : b)
+                    : '';
+                
+                // 좌표를 키로 사용하여 중복 방지 (같은 좌표는 하나의 장소로 취급)
+                // 프론트엔드 호환성을 위해 장소명을 키로 사용하되, 좌표가 같으면 덮어쓰기
+                const key = mostUsedPlaceName;
+                
+                // 같은 좌표 그룹이 이미 있으면 reasons만 합치기
+                // (같은 장소명이지만 다른 좌표인 경우는 별도로 유지)
+                if (recommendations[key]) {
+                    const existingLocationKey = getLocationKey(recommendations[key].x, recommendations[key].y);
+                    if (existingLocationKey === locationKey) {
+                        // 같은 좌표이면 reasons 합치기
+                        recommendations[key].reasons = recommendations[key].reasons.concat(group.reasons);
+                    } else {
+                        // 다른 좌표이면 새로운 항목으로 추가 (장소명 + 좌표로 고유 키 생성)
+                        const uniqueKey = `${key}_${locationKey}`;
+                        recommendations[uniqueKey] = {
+                            placeName: mostUsedPlaceName,
+                            address: mostUsedAddress,
+                            x: group.x,
+                            y: group.y,
+                            reasons: group.reasons
+                        };
+                    }
+                } else {
+                    recommendations[key] = {
+                        placeName: mostUsedPlaceName,
+                        address: mostUsedAddress,
+                        x: group.x,
+                        y: group.y,
+                        reasons: group.reasons
+                    };
                 }
             });
         }
