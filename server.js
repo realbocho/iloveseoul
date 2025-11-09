@@ -151,27 +151,59 @@ app.post('/api/recommendations', async (req, res) => {
     try {
         const { placeName, address, x, y, reason } = req.body;
 
+        console.log('📥 추천 추가 요청 받음:', { 
+            placeName, 
+            address, 
+            x, 
+            y, 
+            reason: reason?.substring(0, 50) 
+        });
+
         if (!placeName || !reason || !x || !y) {
+            console.error('❌ 필수 필드 누락:', { 
+                placeName: !!placeName, 
+                reason: !!reason, 
+                x: !!x, 
+                y: !!y 
+            });
             return res.status(400).json({ error: '필수 필드가 누락되었습니다.' });
         }
+
+        const insertData = {
+            place_name: placeName,
+            address: address || null,
+            x: parseFloat(x),
+            y: parseFloat(y),
+            reason: reason
+        };
+
+        console.log('💾 Supabase에 삽입 시도:', insertData);
+        console.log('🔑 Supabase URL:', supabaseUrl ? '설정됨' : '없음');
+        console.log('🔑 Supabase Key:', supabaseKey ? '설정됨' : '없음');
 
         // Supabase에 데이터 삽입
         const { data, error } = await supabase
             .from('recommendations')
-            .insert({
-                place_name: placeName,
-                address: address || null,
-                x: parseFloat(x),
-                y: parseFloat(y),
-                reason: reason
-            })
+            .insert(insertData)
             .select()
             .single();
 
         if (error) {
-            console.error('추천 추가 오류:', error.message);
-            return res.status(500).json({ error: '추천 추가 실패: ' + error.message });
+            console.error('❌ Supabase 삽입 오류:', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code
+            });
+            return res.status(500).json({ 
+                error: '추천 추가 실패: ' + error.message,
+                details: error.details || null,
+                hint: error.hint || null,
+                code: error.code || null
+            });
         }
+
+        console.log('✅ 추천 추가 성공:', { id: data?.id, placeName });
 
         res.json({ 
             success: true, 
@@ -179,8 +211,11 @@ app.post('/api/recommendations', async (req, res) => {
             id: data.id 
         });
     } catch (error) {
-        console.error('추천 추가 중 오류:', error);
-        res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+        console.error('❌ 추천 추가 중 예외 발생:', error);
+        res.status(500).json({ 
+            error: '서버 오류가 발생했습니다.',
+            message: error.message 
+        });
     }
 });
 
