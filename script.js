@@ -479,8 +479,8 @@ async function deleteRecommendation(placeName, x, y) {
     try {
         console.log('🗑️ 삭제 요청:', { placeName, x, y });
         
-        const response = await fetch(`${API_BASE_URL}/recommendations`, {
-            method: 'DELETE',
+        const response = await fetch(`${API_BASE_URL}/recommendations/delete`, {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
